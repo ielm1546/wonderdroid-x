@@ -5,6 +5,7 @@
 #include "mednafen/mednafen.h"
 #include "mednafen/state-driver.h"
 #include "mednafen/mednafen-driver.h"
+#include "mednafen/wswan/net_link.h"
 
 #include "com_atelieryl_wonderdroid_WonderSwan.h"
 
@@ -29,10 +30,45 @@ double _masterClock;
 
 extern "C" {
 
+    JNIEXPORT jboolean JNICALL
+    Java_com_atelieryl_wonderdroid_WonderSwan_startHost(JNIEnv *env, jclass obj, jint port) {
+        if (port <= 0 || port > 65535) {
+            return JNI_FALSE;
+        }
+        return NetLink_StartHost((int)port) ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT jboolean JNICALL
+    Java_com_atelieryl_wonderdroid_WonderSwan_connectToHost(JNIEnv *env, jclass obj, jstring ip, jint port) {
+        if (!ip || port <= 0 || port > 65535) {
+            return JNI_FALSE;
+        }
+        const char *ip_chars = env->GetStringUTFChars(ip, NULL);
+        if (!ip_chars) {
+            return JNI_FALSE;
+        }
+        bool ok = NetLink_ConnectToHost(ip_chars, (int)port);
+        env->ReleaseStringUTFChars(ip, ip_chars);
+        return ok ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT void JNICALL
+    Java_com_atelieryl_wonderdroid_WonderSwan_disconnect(JNIEnv *env, jclass obj) {
+        NetLink_Disconnect();
+    }
+
+    JNIEXPORT jboolean JNICALL
+    Java_com_atelieryl_wonderdroid_WonderSwan_isNetConnected(JNIEnv *env, jclass obj) {
+        return NetLink_IsConnected() ? JNI_TRUE : JNI_FALSE;
+    }
+
     JNIEXPORT void JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_exit(JNIEnv *env, jclass obj) {
         _runGame = false;
+        NetLink_Disconnect();
         MDFNI_CloseGame();
         delete _surf;
+        _surf = NULL;
+        _game = NULL;
     }
 
     JNIEXPORT void JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_reset(JNIEnv *env, jclass obj) {
@@ -43,32 +79,48 @@ extern "C" {
     Java_com_atelieryl_wonderdroid_WonderSwan_load(JNIEnv *env, jclass obj, jstring rom_path,
                                                    jstring dir_path, jstring name, jint year, jint month, jint day,
                                                    jstring blood, jstring sex, jstring language) {
+        const char *rom_path_c = rom_path ? env->GetStringUTFChars(rom_path, NULL) : NULL;
+        const char *dir_path_c = dir_path ? env->GetStringUTFChars(dir_path, NULL) : NULL;
+        const char *name_c = name ? env->GetStringUTFChars(name, NULL) : NULL;
+        const char *blood_c = blood ? env->GetStringUTFChars(blood, NULL) : NULL;
+        const char *sex_c = sex ? env->GetStringUTFChars(sex, NULL) : NULL;
+        const char *language_c = language ? env->GetStringUTFChars(language, NULL) : NULL;
+
         // Initialize Mednafen
         if (!_initialized) {
             MDFNI_Init();
-            MDFNI_InitFinalize(env->GetStringUTFChars(dir_path, NULL));
-            MDFNI_SetSetting("filesys.path_sav", env->GetStringUTFChars(dir_path, NULL));
-            //MDFNI_SetSetting("filesys.path_state", env->GetStringUTFChars(dir_path, NULL));
+            MDFNI_InitFinalize(dir_path_c ? dir_path_c : "");
+            MDFNI_SetSetting("filesys.path_sav", dir_path_c ? dir_path_c : "");
+            //MDFNI_SetSetting("filesys.path_state", dir_path_c ? dir_path_c : "");
             MDFNI_SetSetting("filesys.fname_sav", "%f%e.%x");
             MDFNI_SetSetting("filesys.fname_state", "%f%e.%X");
-            MDFNI_SetSetting("wswan.name", env->GetStringUTFChars(name, NULL));
+            MDFNI_SetSetting("wswan.name", name_c ? name_c : "");
             MDFNI_SetSetting("wswan.byear", std::to_string(year).c_str());
             MDFNI_SetSetting("wswan.bmonth", std::to_string(month).c_str());
             MDFNI_SetSetting("wswan.bday", std::to_string(day).c_str());
-            MDFNI_SetSetting("wswan.blood", env->GetStringUTFChars(blood, NULL));
-            MDFNI_SetSetting("wswan.sex", env->GetStringUTFChars(sex, NULL));
-            MDFNI_SetSetting("wswan.language", env->GetStringUTFChars(language, NULL));
-            MDFNI_SetSetting("ngp.language", env->GetStringUTFChars(language, NULL));
+            MDFNI_SetSetting("wswan.blood", blood_c ? blood_c : "");
+            MDFNI_SetSetting("wswan.sex", sex_c ? sex_c : "");
+            MDFNI_SetSetting("wswan.language", language_c ? language_c : "");
+            MDFNI_SetSetting("ngp.language", language_c ? language_c : "");
             _initialized = true;
         }
 
         // Load ROM
-        _game = MDFNI_LoadGame(NULL, &::Mednafen::NVFS, env->GetStringUTFChars(rom_path, NULL));
+        _game = MDFNI_LoadGame(NULL, &::Mednafen::NVFS, rom_path_c ? rom_path_c : "");
+
+        if (rom_path && rom_path_c) env->ReleaseStringUTFChars(rom_path, rom_path_c);
+        if (dir_path && dir_path_c) env->ReleaseStringUTFChars(dir_path, dir_path_c);
+        if (name && name_c) env->ReleaseStringUTFChars(name, name_c);
+        if (blood && blood_c) env->ReleaseStringUTFChars(blood, blood_c);
+        if (sex && sex_c) env->ReleaseStringUTFChars(sex, sex_c);
+        if (language && language_c) env->ReleaseStringUTFChars(language, language_c);
+
         if (!_game) return NULL;
 
         // Prevent Master System games from running
         if (strcmp(_game->shortname, "sms") == 0) {
             MDFNI_CloseGame();
+            _game = NULL;
             return env->NewLongArray(GAME_INFO_ARRAY_SIZE);
         }
 
@@ -103,7 +155,7 @@ extern "C" {
     Java_com_atelieryl_wonderdroid_WonderSwan__1execute_1frame(JNIEnv *env, jclass obj, jboolean skip,
                                                                jboolean audio, jobject framebuffer,
                                                                jshortArray audiobuffer) {
-        if (!_runGame) return NULL;
+        if (!_runGame || !_game || !_surf) return NULL;
 
         // Mednafen emulate
         static int16_t sound_buf[SOUND_BUF_SIZE];
@@ -124,10 +176,14 @@ extern "C" {
 
         // Copy framebuffer
         uint32_t* fb = (uint32_t*) env->GetDirectBufferAddress(framebuffer);
-        memcpy(fb, _surf->pixels, _game->fb_width * _game->fb_height * sizeof(uint32_t));
+        if (fb && _surf->pixels) {
+            memcpy(fb, _surf->pixels, _game->fb_width * _game->fb_height * sizeof(uint32_t));
+        }
 
         // Audio
-        env->SetShortArrayRegion(audiobuffer, 0, spec.SoundBufSize * _game->soundchan, sound_buf);
+        if (audiobuffer) {
+            env->SetShortArrayRegion(audiobuffer, 0, spec.SoundBufSize * _game->soundchan, sound_buf);
+        }
 
         jint frameInfo[FRAME_INFO_ARRAY_SIZE];
         frameInfo[0] = spec.SoundBufSize;
@@ -152,6 +208,8 @@ extern "C" {
                                                             jboolean x1, jboolean x2, jboolean x3,
                                                             jboolean x4, jboolean a, jboolean b,
                                                             jboolean start, jboolean select) {
+        if (!_game || !_inputBuffer[0]) return;
+
         if (_game->shortname[0] == 'w') {
             *_inputBuffer[0] = setBit(*_inputBuffer[0], x1, 0);
             *_inputBuffer[0] = setBit(*_inputBuffer[0], x2, 1);
@@ -200,15 +258,23 @@ extern "C" {
 
     JNIEXPORT void JNICALL
     Java_com_atelieryl_wonderdroid_WonderSwan_loadstate(JNIEnv *env, jclass obj, jstring filename) {
+        if (!filename) return;
+        const char *filename_c = env->GetStringUTFChars(filename, NULL);
+        if (!filename_c) return;
         _runGame = false;
-        MDFNI_LoadState(env->GetStringUTFChars(filename, NULL), "");
+        MDFNI_LoadState(filename_c, "");
+        env->ReleaseStringUTFChars(filename, filename_c);
         _runGame = true;
     }
 
     JNIEXPORT void JNICALL
     Java_com_atelieryl_wonderdroid_WonderSwan_savestate(JNIEnv *env, jclass obj, jstring filename) {
+        if (!filename) return;
+        const char *filename_c = env->GetStringUTFChars(filename, NULL);
+        if (!filename_c) return;
         _runGame = false;
-        MDFNI_SaveState(env->GetStringUTFChars(filename, NULL), "", NULL, NULL, NULL);
+        MDFNI_SaveState(filename_c, "", NULL, NULL, NULL);
+        env->ReleaseStringUTFChars(filename, filename_c);
         _runGame = true;
     }
 
