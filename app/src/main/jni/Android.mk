@@ -248,6 +248,7 @@ LOCAL_SRC_FILES := \
     mednafen/video/text.cpp \
     mednafen/video/video.cpp \
     mednafen/wswan/comm.cpp \
+    mednafen/wswan/net_link.cpp \
     mednafen/wswan/dis/dis_decode.cpp \
     mednafen/wswan/dis/dis_groups.cpp \
     mednafen/wswan/dis/resolve.cpp \
