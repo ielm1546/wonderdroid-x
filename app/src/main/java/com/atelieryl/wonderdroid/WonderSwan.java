@@ -1,4 +1,3 @@
-
 package com.atelieryl.wonderdroid;
 
 import java.nio.IntBuffer;
@@ -59,6 +58,14 @@ public class WonderSwan {
     static {
         System.loadLibrary("mednafen");
     }
+
+    static public native boolean startHost(int port);
+
+    static public native boolean connectToHost(String ip, int port);
+
+    static public native void disconnect();
+
+    static public native boolean isNetConnected();
 
     static public native long[] load(String rom_path, String dir_path, String name, int year, int month,
                                     int day, String blood, String sex, String language);
