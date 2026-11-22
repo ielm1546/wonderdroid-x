@@ -16,6 +16,7 @@
  */
 
 #include "wswan.h"
+#include "net_link.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -118,9 +119,19 @@ void Comm_Reset(void)
 
 void Comm_Process(void)
 {
+ const bool net_connected = NetLink_IsConnected();
+
  if(SendLatched && (Control & 0x80))
  {
-  if(stdin_pipes[1] != -1)
+  if(net_connected)
+  {
+   if(NetLink_SendByte(SendBuf))
+   {
+    SendLatched = false;
+    WSwan_Interrupt(WSINT_SERIAL_SEND);
+   }
+  }
+  else if(stdin_pipes[1] != -1)
   {
    if(write(stdin_pipes[1], &SendBuf, 1) == 1)
    {
@@ -136,9 +147,20 @@ void Comm_Process(void)
    WSwan_Interrupt(WSINT_SERIAL_SEND);
   }
  }
- else if(!RecvLatched && (Control & 0x20))
+
+ if(!RecvLatched && (Control & 0x20))
  {
-  if(stdout_pipes[0] != -1)
+  if(net_connected)
+  {
+   uint8 incoming = 0x00;
+   if(NetLink_RecvByte(&incoming))
+   {
+    RecvBuf = incoming;
+    RecvLatched = true;
+    WSwan_InterruptAssert(WSINT_SERIAL_RECV, RecvLatched);
+   }
+  }
+  else if(stdout_pipes[0] != -1)
   {
    if(read(stdout_pipes[0], &RecvBuf, 1) == 1)
    {
