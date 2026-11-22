@@ -16,6 +16,38 @@ extern "C" {
 
 /*
 * Class:     com_atelieryl_wonderdroid_WonderSwan
+* Method:    startHost
+* Signature: (I)Z
+*/
+JNIEXPORT jboolean JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_startHost
+(JNIEnv *, jclass, jint);
+
+/*
+* Class:     com_atelieryl_wonderdroid_WonderSwan
+* Method:    connectToHost
+* Signature: (Ljava/lang/String;I)Z
+*/
+JNIEXPORT jboolean JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_connectToHost
+(JNIEnv *, jclass, jstring, jint);
+
+/*
+* Class:     com_atelieryl_wonderdroid_WonderSwan
+* Method:    disconnect
+* Signature: ()V
+*/
+JNIEXPORT void JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_disconnect
+(JNIEnv *, jclass);
+
+/*
+* Class:     com_atelieryl_wonderdroid_WonderSwan
+* Method:    isNetConnected
+* Signature: ()Z
+*/
+JNIEXPORT jboolean JNICALL Java_com_atelieryl_wonderdroid_WonderSwan_isNetConnected
+(JNIEnv *, jclass);
+
+/*
+* Class:     com_atelieryl_wonderdroid_WonderSwan
 * Method:    load
 * Signature: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)[J
 */
